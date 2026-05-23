@@ -121,9 +121,20 @@ def send_or_edit_webhook(payload: dict) -> None:
 async def main_loop():
     logger.info("Market Movers Webhook Daemon Service Running.")
     
+    # Force one update on startup so the user sees data immediately (even if market is closed)
+    logger.info("Performing startup fetch...")
+    try:
+        data = await asyncio.to_thread(get_top_movers)
+        payload = build_embed_payload(data)
+        if not is_market_open():
+            payload["embeds"][0]["title"] = "📊  NSE Market Movers — (Last Session)"
+        send_or_edit_webhook(payload)
+    except Exception as e:
+        logger.error(f"Startup fetch failed: {e}")
+
     while True:
         if not is_market_open():
-            logger.info("Market closed — skipping fetch.")
+            logger.info("Market closed — skipping periodic update.")
         else:
             try:
                 # Offload synchronous requests process to an async-safe thread pool worker
