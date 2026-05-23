@@ -1,62 +1,73 @@
 """
-nse_client.py — Fetches top 5 gainers & losers directly from NSE India.
-No calculations. NSE data is used as-is.
+nse_client.py — Reliable NSE data via Yahoo Finance.
+Used as a stable alternative since NSE India blocks cloud IPs.
 """
 
-import time
 import logging
-import requests
+import yfinance as yf
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-_NSE_BASE    = "https://www.nseindia.com"
-_GAINERS_URL = f"{_NSE_BASE}/api/live-analysis-variations?index=gainers"
-_LOSERS_URL  = f"{_NSE_BASE}/api/live-analysis-variations?index=loosers"
+# List of major NIFTY 50 / Large cap symbols to track
+_SYMBOLS = [
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "BHARTIARTL.NS",
+    "INFY.NS", "SBIN.NS", "LICI.NS", "HINDUNILVR.NS", "ITC.NS",
+    "LT.NS", "HCLTECH.NS", "BAJFINANCE.NS", "SUNPHARMA.NS", "ADANIENT.NS",
+    "MARUTI.NS", "AXISBANK.NS", "ADANIPORTS.NS", "NTPC.NS",
+    "KOTAKBANK.NS", "TITAN.NS", "ONGC.NS", "ULTRACEMCO.NS", "ASIANPAINT.NS",
+    "COALINDIA.NS", "BAJAJFINSV.NS", "JSWSTEEL.NS", "M&M.NS", "POWERGRID.NS",
+    "ADANIPOWER.NS", "TATASTEEL.NS", "HINDALCO.NS", "GRASIM.NS", "NESTLEIND.NS"
+]
 
-_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept":           "application/json, text/plain, */*",
-    "Accept-Language":  "en-US,en;q=0.9",
-    "Accept-Encoding":  "gzip, deflate, br",
-    "Referer":          "https://www.nseindia.com/",
-    "X-Requested-With": "XMLHttpRequest",
-}
+def get_top_movers():
+    logger.info(f"Fetching data for {len(_SYMBOLS)} symbols via Yahoo Finance...")
+    
+    try:
+        # Fetch data in bulk
+        data = yf.download(tickers=_SYMBOLS, period="1d", interval="1m", group_by='ticker', progress=False)
+        
+        movers = []
+        for symbol in _SYMBOLS:
+            try:
+                # Get the last two points to calculate change
+                ticker_data = data[symbol]
+                if ticker_data.empty: continue
+                
+                last_price = ticker_data['Close'].iloc[-1]
+                prev_close = ticker_data['Open'].iloc[0] # Using the day's start as reference
+                
+                change = last_price - prev_close
+                p_change = (change / prev_close) * 100
+                
+                movers.append({
+                    "symbol": symbol.replace(".NS", ""),
+                    "ltp": round(last_price, 2),
+                    "netPrice": round(p_change, 2),
+                    "change": round(change, 2)
+                })
+            except Exception:
+                continue
 
+        # Sort by percentage change
+        movers.sort(key=lambda x: x["netPrice"], reverse=True)
+        
+        gainers = [m for m in movers if m["netPrice"] > 0][:5]
+        losers = [m for m in movers if m["netPrice"] < 0]
+        losers.sort(key=lambda x: x["netPrice"]) # Most negative first
+        losers = losers[:5]
 
-def _make_session() -> requests.Session:
-    """Warm up session to get NSE cookies."""
-    s = requests.Session()
-    s.headers.update(_HEADERS)
-    s.get(_NSE_BASE, timeout=12)
-    time.sleep(0.8)
-    return s
+        return {
+            "gainers": gainers,
+            "losers": losers
+        }
 
+    except Exception as e:
+        logger.error(f"Yahoo Finance Fetch Error: {e}")
+        return {"gainers": [], "losers": []}
 
-def _top5(raw: dict) -> list[dict]:
-    """
-    NSE returns data grouped by index (NIFTY, BANKNIFTY, etc.).
-    Pick the first group (usually NIFTY) and return top 5 as-is.
-    """
-    for stocks in raw.values():
-        if isinstance(stocks, list) and stocks:
-            return stocks[:5]
-    return []
-
-
-def get_top_movers() -> dict:
-    session = _make_session()
-
-    r_g = session.get(_GAINERS_URL, timeout=15)
-    r_g.raise_for_status()
-
-    r_l = session.get(_LOSERS_URL, timeout=15)
-    r_l.raise_for_status()
-
-    return {
-        "gainers": _top5(r_g.json()),
-        "losers":  _top5(r_l.json()),
-    }
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    res = get_top_movers()
+    import json
+    print(json.dumps(res, indent=2))
