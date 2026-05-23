@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for nse-moves on 2026-05-22T18:02:36Z
+# fly.toml app configuration file generated for nse-moves on 2026-05-23T17:45:50Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -6,13 +6,21 @@
 app = 'nse-moves'
 primary_region = 'bom'
 
+[build]
+
 [env]
   PORT = '8080'
 
 [processes]
-  app = "python bot.py"
+  app = 'python bot.py'
 
-# No http_service needed for a background bot
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
 
 [[vm]]
   memory = '1gb'
