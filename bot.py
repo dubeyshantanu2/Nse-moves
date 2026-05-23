@@ -45,7 +45,7 @@ def build_embed_payload(data: dict) -> dict:
         "color": 1733608,  # Hex 0x1a73e8 converted to decimal integers for Webhook JSON payload
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "footer": {
-            "text": f"Auto-refreshes every {UPDATE_INTERVAL // 60}m  •  Source: NSE India"
+            "text": f"Auto-refreshes every {UPDATE_INTERVAL // 60}m  •  Source: Dhan.co"
         },
         "fields": []
     }
