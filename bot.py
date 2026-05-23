@@ -10,6 +10,9 @@ import logging
 from datetime import datetime, timezone, time
 from zoneinfo import ZoneInfo
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from nse_client import get_top_movers
 

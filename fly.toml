@@ -12,13 +12,10 @@ primary_region = 'bom'
 [env]
   PORT = '8080'
 
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = 'stop'
-  auto_start_machines = true
-  min_machines_running = 0
-  processes = ['app']
+[processes]
+  app = "python bot.py"
+
+# No http_service needed for a background bot
 
 [[vm]]
   memory = '1gb'
