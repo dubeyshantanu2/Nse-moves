@@ -203,7 +203,8 @@
 
                 if (data.last_updated) {
                     const date = new Date(data.last_updated);
-                    document.getElementById('last-updated').textContent = `Last updated: ${date.toLocaleString()}`;
+                    const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+                    document.getElementById('last-updated').textContent = `Last updated: ${date.toLocaleString('en-IN', options)} (IST)`;
                 }
             } catch (error) {
                 console.error("Error fetching data:", error);
