@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSE Market Movers</title>
+    <style>
+        :root {
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --green: #10b981;
+            --red: #ef4444;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+            color: #111827;
+        }
+
+        .header p {
+            margin: 5px 0 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .dashboard {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 900px;
+            flex-wrap: wrap;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            padding: 20px;
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .card h2 {
+            margin-top: 0;
+            font-size: 1.25rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card.gainers h2 { color: var(--green); }
+        .card.losers h2 { color: var(--red); }
+
+        .stock-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .stock-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .stock-item:last-child {
+            border-bottom: none;
+        }
+
+        .stock-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .stock-price {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        .stock-change {
+            font-weight: bold;
+            text-align: right;
+        }
+
+        .gain { color: var(--green); }
+        .loss { color: var(--red); }
+
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>📊 NSE Market Movers</h1>
+        <p id="last-updated">Loading data...</p>
+    </div>
+
+    <div class="dashboard">
+        <div class="card gainers">
+            <h2>🚀 Top Gainers</h2>
+            <ul class="stock-list" id="gainers-list">
+                <div class="loading">Loading...</div>
+            </ul>
+        </div>
+        <div class="card losers">
+            <h2>📉 Top Losers</h2>
+            <ul class="stock-list" id="losers-list">
+                <div class="loading">Loading...</div>
+            </ul>
+        </div>
+    </div>
+
+    <div class="footer">
+        Auto-refreshes every few minutes • Source: Dhan.co
+    </div>
+
+    <script>
+        function createStockItem(stock, isGainer) {
+            const li = document.createElement('li');
+            li.className = 'stock-item';
+            
+            const infoDiv = document.createElement('div');
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'stock-name';
+            nameDiv.textContent = stock.symbol;
+            
+            const priceDiv = document.createElement('div');
+            priceDiv.className = 'stock-price';
+            priceDiv.textContent = `₹${stock.ltp}`;
+            
+            infoDiv.appendChild(nameDiv);
+            infoDiv.appendChild(priceDiv);
+            
+            const changeDiv = document.createElement('div');
+            changeDiv.className = `stock-change ${isGainer ? 'gain' : 'loss'}`;
+            const sign = isGainer ? '+' : '';
+            changeDiv.innerHTML = `${isGainer ? '🟢' : '🔴'} ${sign}${stock.netPrice}%<br><span style="font-size: 0.85em; color: var(--text-muted)">₹${sign}${stock.change}</span>`;
+            
+            li.appendChild(infoDiv);
+            li.appendChild(changeDiv);
+            return li;
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                
+                const gainersList = document.getElementById('gainers-list');
+                gainersList.innerHTML = '';
+                if (data.gainers && data.gainers.length > 0) {
+                    data.gainers.forEach(stock => {
+                        gainersList.appendChild(createStockItem(stock, true));
+                    });
+                } else {
+                    gainersList.innerHTML = '<div class="loading">No data available</div>';
+                }
+
+                const losersList = document.getElementById('losers-list');
+                losersList.innerHTML = '';
+                if (data.losers && data.losers.length > 0) {
+                    data.losers.forEach(stock => {
+                        losersList.appendChild(createStockItem(stock, false));
+                    });
+                } else {
+                    losersList.innerHTML = '<div class="loading">No data available</div>';
+                }
+
+                if (data.last_updated) {
+                    const date = new Date(data.last_updated);
+                    document.getElementById('last-updated').textContent = `Last updated: ${date.toLocaleString()}`;
+                }
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        }
+
+        // Fetch immediately and then every 30 seconds
+        fetchData();
+        setInterval(fetchData, 30000);
+    </script>
+</body>
+</html>

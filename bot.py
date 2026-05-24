@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from aiohttp import web
 from nse_client import get_top_movers
 
 # Configurations
@@ -29,6 +30,29 @@ logger = logging.getLogger(__name__)
 
 # Tracks the message ID across cycles to update the same layout instead of spamming
 _message_id: str | None = None
+
+# Global state for web dashboard
+_latest_data = {"gainers": [], "losers": [], "last_updated": None}
+
+async def handle_index(request):
+    return web.FileResponse(os.path.join(os.path.dirname(__file__), 'index.html'))
+
+async def handle_data(request):
+    return web.json_response(_latest_data)
+
+async def start_web_server():
+    app = web.Application()
+    app.add_routes([
+        web.get('/', handle_index),
+        web.get('/api/data', handle_data)
+    ])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.getenv("PORT", "8080"))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logger.info(f"Web dashboard started on http://0.0.0.0:{port}")
+
 
 
 def is_market_open() -> bool:
@@ -121,10 +145,19 @@ def send_or_edit_webhook(payload: dict) -> None:
 async def main_loop():
     logger.info("Market Movers Webhook Daemon Service Running.")
     
+    # Start Web Server
+    await start_web_server()
+    
     # Force one update on startup so the user sees data immediately (even if market is closed)
     logger.info("Performing startup fetch...")
     try:
         data = await asyncio.to_thread(get_top_movers)
+        
+        # Update Web Dashboard Data
+        _latest_data["gainers"] = data.get("gainers", [])
+        _latest_data["losers"] = data.get("losers", [])
+        _latest_data["last_updated"] = datetime.now(timezone.utc).isoformat()
+        
         payload = build_embed_payload(data)
         if not is_market_open():
             payload["embeds"][0]["title"] = "📊  NSE Market Movers — (Last Session)"
@@ -139,6 +172,12 @@ async def main_loop():
             try:
                 # Offload synchronous requests process to an async-safe thread pool worker
                 data = await asyncio.to_thread(get_top_movers)
+                
+                # Update Web Dashboard Data
+                _latest_data["gainers"] = data.get("gainers", [])
+                _latest_data["losers"] = data.get("losers", [])
+                _latest_data["last_updated"] = datetime.now(timezone.utc).isoformat()
+                
                 payload = build_embed_payload(data)
             except Exception as e:
                 logger.error(f"Fetch failed: {e}")

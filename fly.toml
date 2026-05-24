@@ -1,12 +1,19 @@
 # fly.toml app configuration file for nse-moves
-# Background worker bot - no HTTP service required
 
 app = 'nse-moves'
 primary_region = 'bom'
 
 [env]
-  # No PORT needed for background bot, but keeping it won't hurt
   UPDATE_INTERVAL_SECONDS = '300'
+  PORT = '8080'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
 
 [processes]
   app = 'python bot.py'
